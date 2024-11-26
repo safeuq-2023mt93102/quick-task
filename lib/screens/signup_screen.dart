@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
-import '../tasks_screen.dart';
+import 'tasks_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});

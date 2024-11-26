@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import 'signup_screen.dart';
-import '../tasks_screen.dart';
+import 'tasks_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

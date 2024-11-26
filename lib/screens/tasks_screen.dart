@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
-import 'task_model.dart';
-import 'screens/login_screen.dart';
+import '../task_model.dart';
+import 'login_screen.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});

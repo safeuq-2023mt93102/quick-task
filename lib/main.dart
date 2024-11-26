@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'tasks_screen.dart';
+import 'screens/tasks_screen.dart';
 import 'parse_init.dart';
 import 'screens/login_screen.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
