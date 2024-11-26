@@ -15,18 +15,16 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _login() async {
+  void _login() {
     setState(() => _isLoading = true);
 
-    try {
-      final user = ParseUser(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-        _emailController.text.trim(),
-      );
+    final user = ParseUser(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+      _emailController.text.trim(),
+    );
 
-      var response = await user.login();
-
+    user.login().then((response) {
       if (response.success) {
         if (!mounted) return;
         Navigator.pushReplacement(
@@ -39,9 +37,16 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text(response.error?.message ?? 'Login failed')),
         );
       }
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    }).catchError((e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }).whenComplete(() {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    });
   }
 
   @override

@@ -159,10 +159,10 @@ class _TasksScreenState extends State<TasksScreen> {
       }
     }).then((_) {
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false);
     });
   }
 

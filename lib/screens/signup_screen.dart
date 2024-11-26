@@ -14,33 +14,39 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _signup() async {
+  void _signup() {
     setState(() => _isLoading = true);
 
-    try {
-      final user = ParseUser.createUser(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-        _emailController.text.trim(),
-      );
+    final user = ParseUser.createUser(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+      _emailController.text.trim(),
+    );
 
-      var response = await user.signUp();
-
+    user.signUp().then((response) {
       if (response.success) {
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const TasksScreen()),
-            (route) => false);
+          context,
+          MaterialPageRoute(builder: (_) => const TasksScreen()),
+          (route) => false,
+        );
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(response.error?.message ?? 'Signup failed')),
         );
       }
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    }).catchError((e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }).whenComplete(() {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    });
   }
 
   @override
