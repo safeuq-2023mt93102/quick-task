@@ -22,30 +22,29 @@ class _TasksScreenState extends State<TasksScreen> {
     _loadTasks();
   }
 
-  Future<void> _loadTasks() async {
+  void _loadTasks() {
     setState(() => _isLoading = true);
 
-    try {
-      final currentUser = await ParseUser.currentUser() as ParseUser;
-      final QueryBuilder<Task> query = QueryBuilder<Task>(Task(currentUser));
-      // ..whereEqualTo('user', currentUser);
-      final response = await query.find();
-
+    ParseUser.currentUser().then((currentUser) {
+      final QueryBuilder<Task> query =
+          QueryBuilder<Task>(Task(currentUser as ParseUser));
+      return query.find();
+    }).then((response) {
       setState(() {
         _tasks = response.cast<Task>();
         _isLoading = false;
       });
-    } catch (e) {
+    }).catchError((e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading tasks: ${e.toString()}')),
         );
       }
       setState(() => _isLoading = false);
-    }
+    });
   }
 
-  Future<void> _showTaskModal({Task? task, ParseUser? currentUser}) async {
+  void _showTaskModal({Task? task, ParseUser? currentUser}) {
     final titleController = TextEditingController(text: task?.title ?? '');
     final dateController = TextEditingController(
       text: task?.dueDate != null
@@ -54,7 +53,7 @@ class _TasksScreenState extends State<TasksScreen> {
     );
     DateTime selectedDate = task?.dueDate ?? DateTime.now();
 
-    bool? result = await showDialog<bool>(
+    showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(task == null ? 'New Task' : 'Edit Task'),
@@ -108,84 +107,78 @@ class _TasksScreenState extends State<TasksScreen> {
           ),
         ],
       ),
-    );
+    ).then((result) {
+      if (result == true) {
+        if (task != null) {
+          task.title = titleController.text;
+          task.dueDate = selectedDate;
+          task.save().then((_) {
+            return _loadTasks();
+          }).catchError((e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error updating task: ${e.toString()}')),
+            );
+          });
+        } else if (currentUser != null) {
+          final newTask = Task(currentUser)
+            ..title = titleController.text
+            ..isCompleted = false
+            ..dueDate = selectedDate;
 
-    if (result == true) {
-      if (task != null) {
-        // Update existing task
-        task.title = titleController.text;
-        task.dueDate = selectedDate;
-        try {
-          await task.save();
-          await _loadTasks();
-        } catch (e) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating task: ${e.toString()}')),
-          );
-        }
-      } else if (currentUser != null) {
-        // Create new task
-        final newTask = Task(currentUser)
-          ..title = titleController.text
-          ..isCompleted = false
-          ..dueDate = selectedDate;
-
-        try {
-          await newTask.save();
-          await _loadTasks();
-        } catch (e) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error creating task: ${e.toString()}')),
-          );
+          newTask.save().then((_) {
+            return _loadTasks();
+          }).catchError((e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error creating task: ${e.toString()}')),
+            );
+          });
         }
       }
-    }
+    });
   }
 
-  Future<void> _toggleTask(Task task, bool? value) async {
+  void _toggleTask(Task task, bool? value) {
     if (value == null) return;
 
     task.isCompleted = value;
-    try {
-      await task.save();
-      await _loadTasks();
-    } catch (e) {
+    task.save().then((_) {
+      return _loadTasks();
+    }).catchError((e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating task: ${e.toString()}')),
       );
-    }
+    });
   }
 
-  Future<void> _logout() async {
-    final currentUser = await ParseUser.currentUser() as ParseUser?;
-    if (currentUser != null) {
-      await currentUser.logout();
+  void _logout() {
+    ParseUser.currentUser().then((currentUser) {
+      if (currentUser != null) {
+        return currentUser.logout();
+      }
+    }).then((_) {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
-    }
+    });
   }
 
-  Future<void> _deleteSelectedTasks() async {
-    try {
-      for (final task in _selectedTasks) {
-        await task.delete();
-      }
+  void _deleteSelectedTasks() {
+    Future.wait(_selectedTasks.map((task) => task.delete())).then((_) {
       setState(() {
         _selectedTasks.clear();
         _isSelectionMode = false;
       });
-      await _loadTasks();
-    } catch (e) {
+      return _loadTasks();
+    }).catchError((e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting tasks: ${e.toString()}')),
       );
-    }
+    });
   }
 
   @override
@@ -223,11 +216,12 @@ class _TasksScreenState extends State<TasksScreen> {
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton(
-              onPressed: () async {
-                final currentUser = await ParseUser.currentUser() as ParseUser?;
-                if (currentUser != null) {
-                  await _showTaskModal(currentUser: currentUser);
-                }
+              onPressed: () {
+                ParseUser.currentUser().then((currentUser) {
+                  if (currentUser != null) {
+                    _showTaskModal(currentUser: currentUser as ParseUser);
+                  }
+                });
               },
               child: const Icon(Icons.add),
             ),
