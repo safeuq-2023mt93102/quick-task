@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import '../task_model.dart';
 import 'login_screen.dart';
+import 'dart:developer' as developer;
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -12,7 +13,7 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> {
   List<Task> _tasks = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   Set<Task> _selectedTasks = {};
   bool _isSelectionMode = false;
 
@@ -23,15 +24,19 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _loadTasks() {
+    if (_isLoading) {
+      return;
+    }
     setState(() => _isLoading = true);
 
+    developer.log("_loadTasks called");
     ParseUser.currentUser().then((currentUser) {
       final QueryBuilder<Task> query =
           QueryBuilder<Task>(Task(currentUser as ParseUser));
       return query.find();
     }).then((response) {
       setState(() {
-        _tasks = response.cast<Task>();
+        _tasks = response;
         _isLoading = false;
       });
     }).catchError((e) {
@@ -112,8 +117,11 @@ class _TasksScreenState extends State<TasksScreen> {
         if (task != null) {
           task.title = titleController.text;
           task.dueDate = selectedDate;
+          setState(() {
+            _tasks.add(task);
+          });
           task.save().then((_) {
-            return _loadTasks();
+            // return _loadTasks();
           }).catchError((e) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -208,6 +216,10 @@ class _TasksScreenState extends State<TasksScreen> {
             )
           else
             IconButton(
+              icon: const Icon(Icons.sync),
+              onPressed: _loadTasks,
+            ),
+            IconButton(
               icon: const Icon(Icons.logout),
               onPressed: _logout,
             ),
@@ -225,8 +237,8 @@ class _TasksScreenState extends State<TasksScreen> {
               },
               child: const Icon(Icons.add),
             ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+      body: _tasks.isEmpty
+          ? const Center(child: Text("No tasks"))
           : ListView.builder(
               itemCount: _tasks.length,
               padding: const EdgeInsets.all(8.0),

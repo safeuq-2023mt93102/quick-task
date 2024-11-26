@@ -91,6 +91,16 @@ class _LoginScreenState extends State<LoginScreen> {
               },
               child: const Text('Create an account'),
             ),
+            TextButton(
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TasksScreen()),
+                  (route) => false
+                );
+              },
+              child: const Text('Skip'),
+            ),
           ],
         ),
       ),
