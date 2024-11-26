@@ -14,6 +14,8 @@ class _TasksScreenState extends State<TasksScreen> {
   List<Task> _tasks = [];
   final _textController = TextEditingController();
   bool _isLoading = true;
+  Set<Task> _selectedTasks = {};
+  bool _isSelectionMode = false;
 
   @override
   void initState() {
@@ -100,17 +102,54 @@ class _TasksScreenState extends State<TasksScreen> {
     }
   }
 
+  Future<void> _deleteSelectedTasks() async {
+    try {
+      for (final task in _selectedTasks) {
+        await task.delete();
+      }
+      setState(() {
+        _selectedTasks.clear();
+        _isSelectionMode = false;
+      });
+      await _loadTasks();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting tasks: ${e.toString()}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Tasks'),
+        title: _isSelectionMode
+            ? Text('${_selectedTasks.length} selected')
+            : const Text('My Tasks'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  setState(() {
+                    _selectedTasks.clear();
+                    _isSelectionMode = false;
+                  });
+                },
+              )
+            : null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
+          if (_isSelectionMode)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _deleteSelectedTasks,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+            ),
         ],
       ),
       body: _isLoading
@@ -149,29 +188,71 @@ class _TasksScreenState extends State<TasksScreen> {
                       final task = _tasks[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8.0),
-                        child: ListTile(
-                          leading: Checkbox(
-                            value: task.isCompleted,
-                            onChanged: (value) => _toggleTask(task, value),
-                          ),
-                          title: Text(
-                            task.title,
-                            style: TextStyle(
-                              decoration: task.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                          subtitle: task.dueDate != null
-                              ? Text(
-                                  'Due: ${task.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}',
-                                  style: TextStyle(
-                                    decoration: task.isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                  ),
-                                )
+                        color: _selectedTasks.contains(task)
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : null,
+                        child: InkWell(
+                          onLongPress: () {
+                            setState(() {
+                              _isSelectionMode = true;
+                              _selectedTasks.add(task);
+                            });
+                          },
+                          onTap: _isSelectionMode
+                              ? () {
+                                  setState(() {
+                                    if (_selectedTasks.contains(task)) {
+                                      _selectedTasks.remove(task);
+                                      if (_selectedTasks.isEmpty) {
+                                        _isSelectionMode = false;
+                                      }
+                                    } else {
+                                      _selectedTasks.add(task);
+                                    }
+                                  });
+                                }
                               : null,
+                          child: ListTile(
+                            leading: _isSelectionMode
+                                ? Checkbox(
+                                    value: _selectedTasks.contains(task),
+                                    onChanged: (selected) {
+                                      setState(() {
+                                        if (selected ?? false) {
+                                          _selectedTasks.add(task);
+                                        } else {
+                                          _selectedTasks.remove(task);
+                                          if (_selectedTasks.isEmpty) {
+                                            _isSelectionMode = false;
+                                          }
+                                        }
+                                      });
+                                    },
+                                  )
+                                : Checkbox(
+                                    value: task.isCompleted,
+                                    onChanged: (value) =>
+                                        _toggleTask(task, value),
+                                  ),
+                            title: Text(
+                              task.title,
+                              style: TextStyle(
+                                decoration: task.isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                            subtitle: task.dueDate != null
+                                ? Text(
+                                    'Due: ${task.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}',
+                                    style: TextStyle(
+                                      decoration: task.isCompleted
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  )
+                                : null,
+                          ),
                         ),
                       );
                     },
