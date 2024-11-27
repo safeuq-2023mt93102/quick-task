@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
-import 'package:provider/provider.dart';
-import 'package:quick_task/main.dart';
-import 'package:quick_task/models/task_model.dart';
 import 'signup_screen.dart';
-import 'tasks_screen.dart';
 import 'dart:developer' as developer;
 
 class LoginScreen extends StatefulWidget {

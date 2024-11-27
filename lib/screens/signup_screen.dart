@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
-import 'tasks_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -12,10 +11,16 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
 
   void _signup() {
-    setState(() => _isLoading = true);
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
 
     final user = ParseUser.createUser(
       _emailController.text.trim(),
@@ -24,6 +29,9 @@ class _SignupScreenState extends State<SignupScreen> {
     );
 
     user.signUp().then((response) {
+      // Close loading dialog
+      Navigator.pop(context);
+
       if (response.success) {
         if (!mounted) return;
         int screenCount = 2;
@@ -35,14 +43,13 @@ class _SignupScreenState extends State<SignupScreen> {
         );
       }
     }).catchError((e) {
+      // Close loading dialog
+      Navigator.pop(context);
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
-    }).whenComplete(() {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
     });
   }
 
@@ -74,10 +81,8 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _isLoading ? null : _signup,
-              child: _isLoading
-                  ? const CircularProgressIndicator()
-                  : const Text('Sign Up'),
+              onPressed: _signup,
+              child: const Text('Sign Up'),
             ),
           ],
         ),
