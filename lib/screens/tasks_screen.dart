@@ -17,11 +17,20 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> {
   bool _isLoading = true;
+  bool _isLoggedIn = false;
   final Set<Task> _selectedTasks = {};
   bool _isSelectionMode = false;
 
   @override
   void initState() {
+    ParseUser.currentUser().then((user) => {
+          if (user != null)
+            {
+              setState(() {
+                _isLoggedIn = true;
+              })
+            }
+        });
     super.initState();
   }
 
@@ -143,6 +152,14 @@ class _TasksScreenState extends State<TasksScreen> {
     });
   }
 
+  void _login() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   void _deleteSelectedTasks(TaskModel taskModel) {
     taskModel.deleteTasks(_selectedTasks.toList()).then((_) {
       setState(() {
@@ -193,10 +210,15 @@ class _TasksScreenState extends State<TasksScreen> {
               icon: const Icon(Icons.sync),
               onPressed: () => _reloadTasks(taskModel),
             ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
+          _isLoggedIn
+              ? IconButton(
+                  icon: const Icon(Icons.logout),
+                  onPressed: _logout,
+                )
+              : IconButton(
+                  icon: const Icon(Icons.login),
+                  onPressed: _login,
+                ),
         ],
       ),
       floatingActionButton: _isSelectionMode

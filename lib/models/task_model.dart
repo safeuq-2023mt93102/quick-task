@@ -4,6 +4,8 @@ import 'task.dart';
 import 'dart:developer' as developer;
 
 class TaskModel extends ChangeNotifier {
+  static List<Task> _offlineTasks = [];
+
   TaskModel() {
     reloadTasks();
   }
@@ -19,7 +21,7 @@ class TaskModel extends ChangeNotifier {
   Future reloadTasks() {
     _loader = ParseUser.currentUser().then((currentUser) {
       if (currentUser == null) {
-        return Future.value(_tasks);
+        return Future.value(_offlineTasks);
       }
       final QueryBuilder<Task> query = QueryBuilder<Task>(Task());
       return query.find();
