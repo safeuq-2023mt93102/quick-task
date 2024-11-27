@@ -1,45 +1,55 @@
+import 'package:flutter/foundation.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import '../task_model.dart';
 import 'dart:developer' as developer;
 
-class TaskManager {
-  static final TaskManager _instance = TaskManager._internal();
-
-  factory TaskManager() => _instance;
-
-  TaskManager._internal();
+class TaskModel extends ChangeNotifier {
+  TaskModel() {
+    reloadTasks();
+  }
 
   List<Task> _tasks = [];
 
+  Future _loader = Future.value(true);
+
+  Future get loader => _loader;
+
   List<Task> get tasks => List.unmodifiable(_tasks);
 
-  Future<List<Task>> loadTasks() {
-    return ParseUser.currentUser().then((currentUser) {
+  Future reloadTasks() {
+    _loader = ParseUser.currentUser().then((currentUser) {
       if (currentUser == null) {
-        throw 'No user logged in';
+        return Future.value(_tasks);
       }
       final QueryBuilder<Task> query = QueryBuilder<Task>(Task());
       return query.find();
     }).then((response) {
       _tasks = response;
+      notifyListeners();
       return _tasks;
     });
+    return _loader;
   }
 
   Future<Task> createTask(String title, DateTime dueDate) {
+    final task = Task()
+      ..title = title
+      ..isCompleted = false
+      ..dueDate = dueDate;
+    notifyListeners();
+    final int index = _tasks.length;
+    _tasks.add(task);
+    notifyListeners();
+
     return ParseUser.currentUser().then((currentUser) {
       if (currentUser == null) {
-        throw 'No user logged in';
+        return task;
       }
-      final task = Task()
-        ..user = currentUser
-        ..title = title
-        ..isCompleted = false
-        ..dueDate = dueDate;
+      task.user = currentUser;
       return task.save().then((response) {
         if (response.success) {
           final newTask = response.results!.first as Task;
-          _tasks.add(newTask);
+          _tasks[index] = newTask;
           return newTask;
         }
         throw response.error?.message ?? 'Failed to create task';
@@ -53,6 +63,8 @@ class TaskManager {
       return Future.error('Object index not found');
     }
     _tasks[index] = task;
+    notifyListeners();
+
     developer.log("updateTask outside", error: task.toString());
     return task.save().then((response) {
       if (response.success) {
@@ -67,15 +79,10 @@ class TaskManager {
     });
   }
 
-  Future<Task> toggleTaskCompletion(Task task) {
-    task.isCompleted = !task.isCompleted;
-    return updateTask(task);
-  }
-
   Future<void> deleteTasks(List<Task> tasksToDelete) {
-    return Future.wait(tasksToDelete.map((task) => task.delete())).then((_) {
-      _tasks.removeWhere(
-          (task) => tasksToDelete.any((t) => t.objectId == task.objectId));
-    });
+    _tasks.removeWhere(
+        (task) => tasksToDelete.any((t) => t.objectId == task.objectId));
+    notifyListeners();
+    return Future.wait(tasksToDelete.map((task) => task.delete()));
   }
 }

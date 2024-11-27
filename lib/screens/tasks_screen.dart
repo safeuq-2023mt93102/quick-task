@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
+import 'package:provider/provider.dart';
 import '../task_model.dart';
 import '../models/task_manager.dart';
 import 'login_screen.dart';
@@ -9,46 +10,34 @@ class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
 
   @override
-  State<TasksScreen> createState() => _TasksScreenState();
+  State<TasksScreen> createState() {
+    return _TasksScreenState();
+  }
 }
 
 class _TasksScreenState extends State<TasksScreen> {
-  final _taskManager = TaskManager();
-  bool _isLoading = false;
-  Set<Task> _selectedTasks = {};
+  bool _isLoading = true;
+  final Set<Task> _selectedTasks = {};
   bool _isSelectionMode = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTasks();
   }
 
-  void _loadTasks() {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-
-    developer.log("_loadTasks called");
-    _taskManager.loadTasks().then((_) {
-      setState(() => _isLoading = false);
-    }).catchError((e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading tasks: ${e.toString()}')),
-        );
-      }
-      setState(() => _isLoading = false);
+  _reloadTasks(TaskModel taskModel) {
+    setState(() {
+      _isLoading = true;
     });
+    taskModel.reloadTasks();
   }
 
-  void _showTaskModal({Task? task}) {
+  void _showTaskModal(TaskModel taskManager, {Task? task}) {
     final titleController = TextEditingController(text: task?.title ?? '');
-    final dateController = TextEditingController(
-      text: task?.dueDate != null
-          ? '${task!.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}'
-          : '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-    );
     DateTime selectedDate = task?.dueDate ?? DateTime.now();
+    final dateController = TextEditingController(
+      text: '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+    );
 
     showDialog<bool>(
       context: context,
@@ -109,37 +98,33 @@ class _TasksScreenState extends State<TasksScreen> {
         if (task != null) {
           task.title = titleController.text;
           task.dueDate = selectedDate;
-          _taskManager.updateTask(task).then((_) {
-            setState(() {});
-          }).catchError((e) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error updating task: ${e.toString()}')),
-            );
-          });
+          taskManager.updateTask(task).then((_) => null).catchError(
+              (e) => showError('Error updating task: ${e.toString()}'));
         } else {
-          _taskManager.createTask(titleController.text, selectedDate).then((_) {
-            setState(() {});
-          }).catchError((e) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error creating task: ${e.toString()}')),
-            );
-          });
+          taskManager
+              .createTask(titleController.text, selectedDate)
+              .then((_) => null)
+              .catchError(
+                  (e) => showError('Error creating task: ${e.toString()}'));
         }
       }
     });
   }
 
-  void _toggleTask(Task task, bool? value, [int? index]) {
+  Null showError(String message) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+    return null;
+  }
+
+  void _toggleTask(TaskModel taskModel, Task task, bool? value, [int? index]) {
     if (value == null) return;
     task.isCompleted = value;
-    _taskManager.updateTask(task, index).then((_) {
-      setState(() {});
-    }).catchError((e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating task: ${e.toString()}')),
-      );
+    taskModel.updateTask(task, index).then((_) => null).catchError((e) {
+      showError('Error updating task: ${e.toString()}');
     });
   }
 
@@ -158,22 +143,28 @@ class _TasksScreenState extends State<TasksScreen> {
     });
   }
 
-  void _deleteSelectedTasks() {
-    _taskManager.deleteTasks(_selectedTasks.toList()).then((_) {
+  void _deleteSelectedTasks(TaskModel taskModel) {
+    taskModel.deleteTasks(_selectedTasks.toList()).then((_) {
       setState(() {
         _selectedTasks.clear();
         _isSelectionMode = false;
       });
-    }).catchError((e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting tasks: ${e.toString()}')),
-      );
-    });
+    }).catchError((e) => showError('Error deleting tasks: ${e.toString()}'));
   }
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+        create: (context) => TaskModel(),
+        child: Consumer<TaskModel>(builder: (_, taskModel, __) {
+          taskModel.loader.whenComplete(() => setState(() {
+                _isLoading = false;
+              }));
+          return buildScaffold(context, taskModel);
+        }));
+  }
+
+  Scaffold buildScaffold(BuildContext context, TaskModel taskModel) {
     return Scaffold(
       appBar: AppBar(
         title: _isSelectionMode
@@ -195,12 +186,12 @@ class _TasksScreenState extends State<TasksScreen> {
           if (_isSelectionMode)
             IconButton(
               icon: const Icon(Icons.delete),
-              onPressed: _deleteSelectedTasks,
+              onPressed: () => _deleteSelectedTasks(taskModel),
             )
           else
             IconButton(
               icon: const Icon(Icons.sync),
-              onPressed: _loadTasks,
+              onPressed: () => _reloadTasks(taskModel),
             ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -211,89 +202,92 @@ class _TasksScreenState extends State<TasksScreen> {
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton(
-              onPressed: () => _showTaskModal(),
+              onPressed: () => _showTaskModal(taskModel),
               child: const Icon(Icons.add),
             ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _taskManager.tasks.isEmpty
+          : taskModel.tasks.isEmpty
               ? const Center(child: Text("No tasks"))
-              : ListView.builder(
-                  itemCount: _taskManager.tasks.length,
-                  padding: const EdgeInsets.all(8.0),
-                  itemBuilder: (context, index) {
-                    final task = _taskManager.tasks[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8.0),
-                      color: _selectedTasks.contains(task)
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : null,
-                      child: InkWell(
-                        onLongPress: () {
-                          setState(() {
-                            _isSelectionMode = true;
+              : buildTaskList(taskModel),
+    );
+  }
+
+  ListView buildTaskList(TaskModel taskModel) {
+    return ListView.builder(
+      itemCount: taskModel.tasks.length,
+      padding: const EdgeInsets.all(8.0),
+      itemBuilder: (context, index) {
+        final task = taskModel.tasks[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8.0),
+          color: _selectedTasks.contains(task)
+              ? Theme.of(context).colorScheme.primaryContainer
+              : null,
+          child: InkWell(
+            onLongPress: () {
+              setState(() {
+                _isSelectionMode = true;
+                _selectedTasks.add(task);
+              });
+            },
+            onTap: _isSelectionMode
+                ? () {
+                    setState(() {
+                      if (_selectedTasks.contains(task)) {
+                        _selectedTasks.remove(task);
+                        if (_selectedTasks.isEmpty) {
+                          _isSelectionMode = false;
+                        }
+                      } else {
+                        _selectedTasks.add(task);
+                      }
+                    });
+                  }
+                : () => _showTaskModal(taskModel, task: task),
+            child: ListTile(
+              leading: _isSelectionMode
+                  ? Checkbox(
+                      value: _selectedTasks.contains(task),
+                      onChanged: (selected) {
+                        setState(() {
+                          if (selected ?? false) {
                             _selectedTasks.add(task);
-                          });
-                        },
-                        onTap: _isSelectionMode
-                            ? () {
-                                setState(() {
-                                  if (_selectedTasks.contains(task)) {
-                                    _selectedTasks.remove(task);
-                                    if (_selectedTasks.isEmpty) {
-                                      _isSelectionMode = false;
-                                    }
-                                  } else {
-                                    _selectedTasks.add(task);
-                                  }
-                                });
-                              }
-                            : () => _showTaskModal(task: task),
-                        child: ListTile(
-                          leading: _isSelectionMode
-                              ? Checkbox(
-                                  value: _selectedTasks.contains(task),
-                                  onChanged: (selected) {
-                                    setState(() {
-                                      if (selected ?? false) {
-                                        _selectedTasks.add(task);
-                                      } else {
-                                        _selectedTasks.remove(task);
-                                        if (_selectedTasks.isEmpty) {
-                                          _isSelectionMode = false;
-                                        }
-                                      }
-                                    });
-                                  },
-                                )
-                              : Checkbox(
-                                  value: task.isCompleted,
-                                  onChanged: (value) =>
-                                      _toggleTask(task, value, index),
-                                ),
-                          title: Text(
-                            task.title,
-                            style: TextStyle(
-                              decoration: task.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                          subtitle: task.dueDate != null
-                              ? Text(
-                                  'Due: ${task.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}',
-                                  style: TextStyle(
-                                    decoration: task.isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                  ),
-                                )
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
+                          } else {
+                            _selectedTasks.remove(task);
+                            if (_selectedTasks.isEmpty) {
+                              _isSelectionMode = false;
+                            }
+                          }
+                        });
+                      },
+                    )
+                  : Checkbox(
+                      value: task.isCompleted,
+                      onChanged: (value) =>
+                          _toggleTask(taskModel, task, value, index),
+                    ),
+              title: Text(
+                task.title,
+                style: TextStyle(
+                  decoration:
+                      task.isCompleted ? TextDecoration.lineThrough : null,
                 ),
+              ),
+              subtitle: task.dueDate != null
+                  ? Text(
+                      'Due: ${task.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}',
+                      style: TextStyle(
+                        decoration: task.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+        );
+      },
     );
   }
 }
