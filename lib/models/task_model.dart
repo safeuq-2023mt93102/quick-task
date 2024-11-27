@@ -4,22 +4,23 @@ import 'task.dart';
 import 'dart:developer' as developer;
 
 class TaskModel extends ChangeNotifier {
-  static List<Task> _offlineTasks = [];
+  static final List<Task> _offlineTasks = [];
 
   TaskModel() {
     reloadTasks();
   }
 
   List<Task> _tasks = [];
+  bool _isLoading = true;
 
-  Future _loader = Future.value(true);
-
-  Future get loader => _loader;
+  bool get isLoading => _isLoading;
 
   List<Task> get tasks => List.unmodifiable(_tasks);
 
   Future reloadTasks() {
-    _loader = ParseUser.currentUser().then((currentUser) {
+    _isLoading = true;
+    notifyListeners();
+    return ParseUser.currentUser().then((currentUser) {
       if (currentUser == null) {
         return Future.value(_offlineTasks);
       }
@@ -27,10 +28,9 @@ class TaskModel extends ChangeNotifier {
       return query.find();
     }).then((response) {
       _tasks = response;
+      _isLoading = false;
       notifyListeners();
-      return _tasks;
     });
-    return _loader;
   }
 
   Future<Task> createTask(String title, DateTime dueDate) {

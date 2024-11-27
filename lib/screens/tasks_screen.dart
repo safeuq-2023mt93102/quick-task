@@ -16,29 +16,19 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
-  bool _isLoading = true;
   bool _isLoggedIn = false;
   final Set<Task> _selectedTasks = {};
   bool _isSelectionMode = false;
 
   @override
   void initState() {
-    ParseUser.currentUser().then((user) => {
-          if (user != null)
-            {
-              setState(() {
-                _isLoggedIn = true;
-              })
-            }
-        });
+    _updateLoginState();
     super.initState();
   }
 
-  _reloadTasks(TaskModel taskModel) {
-    setState(() {
-      _isLoading = true;
-    });
-    taskModel.reloadTasks();
+  void _updateLoginState() {
+    ParseUser.currentUser()
+        .then((user) => {setState(() => _isLoggedIn = user != null)});
   }
 
   void _showTaskModal(TaskModel taskManager, {Task? task}) {
@@ -137,27 +127,26 @@ class _TasksScreenState extends State<TasksScreen> {
     });
   }
 
-  void _logout() {
+  void _logout(TaskModel taskModel) {
     ParseUser.currentUser().then((user) {
       if (user != null) {
         return user.logout();
       }
     }).then((_) {
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
+      setState(() {
+        _isLoggedIn = false;
+      });
+      taskModel.reloadTasks();
     });
   }
 
-  void _login() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+  void _login(TaskModel taskModel) {
+    Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const LoginScreen()))
+        .then((_) {
+      _updateLoginState();
+      taskModel.reloadTasks();
+    });
   }
 
   void _deleteSelectedTasks(TaskModel taskModel) {
@@ -171,14 +160,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-        create: (context) => TaskModel(),
-        child: Consumer<TaskModel>(builder: (_, taskModel, __) {
-          taskModel.loader.whenComplete(() => setState(() {
-                _isLoading = false;
-              }));
-          return buildScaffold(context, taskModel);
-        }));
+    var taskModel = context.watch<TaskModel>();
+    return buildScaffold(context, taskModel);
   }
 
   Scaffold buildScaffold(BuildContext context, TaskModel taskModel) {
@@ -208,16 +191,18 @@ class _TasksScreenState extends State<TasksScreen> {
           else
             IconButton(
               icon: const Icon(Icons.sync),
-              onPressed: () => _reloadTasks(taskModel),
+              onPressed: () => (TaskModel taskModel) {
+                taskModel.reloadTasks();
+              }(taskModel),
             ),
           _isLoggedIn
               ? IconButton(
                   icon: const Icon(Icons.logout),
-                  onPressed: _logout,
+                  onPressed: () => _logout(taskModel),
                 )
               : IconButton(
                   icon: const Icon(Icons.login),
-                  onPressed: _login,
+                  onPressed: () => _login(taskModel),
                 ),
         ],
       ),
@@ -227,7 +212,7 @@ class _TasksScreenState extends State<TasksScreen> {
               onPressed: () => _showTaskModal(taskModel),
               child: const Icon(Icons.add),
             ),
-      body: _isLoading
+      body: taskModel.isLoading
           ? const Center(child: CircularProgressIndicator())
           : taskModel.tasks.isEmpty
               ? const Center(child: Text("No tasks"))

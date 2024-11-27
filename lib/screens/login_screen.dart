@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
+import 'package:provider/provider.dart';
+import 'package:quick_task/main.dart';
+import 'package:quick_task/models/task_model.dart';
 import 'signup_screen.dart';
 import 'tasks_screen.dart';
+import 'dart:developer' as developer;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,10 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.success) {
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const TasksScreen()),
-        );
+        Navigator.pop(context);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -47,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     }).catchError((e) {
+      developer.log('Login failed', error: e.toString());
       // Close loading dialog
       Navigator.pop(context);
 
@@ -85,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _login,
+              onPressed: () => _login(),
               child: const Text('Login'),
             ),
             TextButton(
@@ -96,15 +98,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 );
               },
               child: const Text('Create an account'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TasksScreen()),
-                    (route) => false);
-              },
-              child: const Text('Skip'),
             ),
           ],
         ),

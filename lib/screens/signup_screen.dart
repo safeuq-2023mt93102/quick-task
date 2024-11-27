@@ -26,11 +26,8 @@ class _SignupScreenState extends State<SignupScreen> {
     user.signUp().then((response) {
       if (response.success) {
         if (!mounted) return;
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const TasksScreen()),
-          (route) => false,
-        );
+        int screenCount = 2;
+        Navigator.popUntil(context, (route) => !(screenCount-- > 0));
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
