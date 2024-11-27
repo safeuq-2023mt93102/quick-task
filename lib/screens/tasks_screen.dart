@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import '../task_model.dart';
+import '../models/task_manager.dart';
 import 'login_screen.dart';
 import 'dart:developer' as developer;
 
@@ -12,7 +13,7 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
-  List<Task> _tasks = [];
+  final _taskManager = TaskManager();
   bool _isLoading = false;
   Set<Task> _selectedTasks = {};
   bool _isSelectionMode = false;
@@ -24,21 +25,12 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _loadTasks() {
-    if (_isLoading) {
-      return;
-    }
+    if (_isLoading) return;
     setState(() => _isLoading = true);
 
     developer.log("_loadTasks called");
-    ParseUser.currentUser().then((currentUser) {
-      final QueryBuilder<Task> query =
-          QueryBuilder<Task>(Task(currentUser as ParseUser));
-      return query.find();
-    }).then((response) {
-      setState(() {
-        _tasks = response;
-        _isLoading = false;
-      });
+    _taskManager.loadTasks().then((_) {
+      setState(() => _isLoading = false);
     }).catchError((e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -49,7 +41,7 @@ class _TasksScreenState extends State<TasksScreen> {
     });
   }
 
-  void _showTaskModal({Task? task, ParseUser? currentUser}) {
+  void _showTaskModal({Task? task}) {
     final titleController = TextEditingController(text: task?.title ?? '');
     final dateController = TextEditingController(
       text: task?.dueDate != null
@@ -117,25 +109,17 @@ class _TasksScreenState extends State<TasksScreen> {
         if (task != null) {
           task.title = titleController.text;
           task.dueDate = selectedDate;
-          setState(() {
-            _tasks.add(task);
-          });
-          task.save().then((_) {
-            // return _loadTasks();
+          _taskManager.updateTask(task).then((_) {
+            setState(() {});
           }).catchError((e) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Error updating task: ${e.toString()}')),
             );
           });
-        } else if (currentUser != null) {
-          final newTask = Task(currentUser)
-            ..title = titleController.text
-            ..isCompleted = false
-            ..dueDate = selectedDate;
-
-          newTask.save().then((_) {
-            return _loadTasks();
+        } else {
+          _taskManager.createTask(titleController.text, selectedDate).then((_) {
+            setState(() {});
           }).catchError((e) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -147,12 +131,11 @@ class _TasksScreenState extends State<TasksScreen> {
     });
   }
 
-  void _toggleTask(Task task, bool? value) {
+  void _toggleTask(Task task, bool? value, [int? index]) {
     if (value == null) return;
-
     task.isCompleted = value;
-    task.save().then((_) {
-      return _loadTasks();
+    _taskManager.updateTask(task, index).then((_) {
+      setState(() {});
     }).catchError((e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating task: ${e.toString()}')),
@@ -161,26 +144,26 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _logout() {
-    ParseUser.currentUser().then((currentUser) {
-      if (currentUser != null) {
-        return currentUser.logout();
+    ParseUser.currentUser().then((user) {
+      if (user != null) {
+        return user.logout();
       }
     }).then((_) {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false);
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     });
   }
 
   void _deleteSelectedTasks() {
-    Future.wait(_selectedTasks.map((task) => task.delete())).then((_) {
+    _taskManager.deleteTasks(_selectedTasks.toList()).then((_) {
       setState(() {
         _selectedTasks.clear();
         _isSelectionMode = false;
       });
-      return _loadTasks();
     }).catchError((e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -219,101 +202,98 @@ class _TasksScreenState extends State<TasksScreen> {
               icon: const Icon(Icons.sync),
               onPressed: _loadTasks,
             ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _logout,
-            ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
         ],
       ),
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton(
-              onPressed: () {
-                ParseUser.currentUser().then((currentUser) {
-                  if (currentUser != null) {
-                    _showTaskModal(currentUser: currentUser as ParseUser);
-                  }
-                });
-              },
+              onPressed: () => _showTaskModal(),
               child: const Icon(Icons.add),
             ),
-      body: _tasks.isEmpty
-          ? const Center(child: Text("No tasks"))
-          : ListView.builder(
-              itemCount: _tasks.length,
-              padding: const EdgeInsets.all(8.0),
-              itemBuilder: (context, index) {
-                final task = _tasks[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8.0),
-                  color: _selectedTasks.contains(task)
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : null,
-                  child: InkWell(
-                    onLongPress: () {
-                      setState(() {
-                        _isSelectionMode = true;
-                        _selectedTasks.add(task);
-                      });
-                    },
-                    onTap: _isSelectionMode
-                        ? () {
-                            setState(() {
-                              if (_selectedTasks.contains(task)) {
-                                _selectedTasks.remove(task);
-                                if (_selectedTasks.isEmpty) {
-                                  _isSelectionMode = false;
-                                }
-                              } else {
-                                _selectedTasks.add(task);
-                              }
-                            });
-                          }
-                        : () => _showTaskModal(task: task),
-                    child: ListTile(
-                      leading: _isSelectionMode
-                          ? Checkbox(
-                              value: _selectedTasks.contains(task),
-                              onChanged: (selected) {
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _taskManager.tasks.isEmpty
+              ? const Center(child: Text("No tasks"))
+              : ListView.builder(
+                  itemCount: _taskManager.tasks.length,
+                  padding: const EdgeInsets.all(8.0),
+                  itemBuilder: (context, index) {
+                    final task = _taskManager.tasks[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8.0),
+                      color: _selectedTasks.contains(task)
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : null,
+                      child: InkWell(
+                        onLongPress: () {
+                          setState(() {
+                            _isSelectionMode = true;
+                            _selectedTasks.add(task);
+                          });
+                        },
+                        onTap: _isSelectionMode
+                            ? () {
                                 setState(() {
-                                  if (selected ?? false) {
-                                    _selectedTasks.add(task);
-                                  } else {
+                                  if (_selectedTasks.contains(task)) {
                                     _selectedTasks.remove(task);
                                     if (_selectedTasks.isEmpty) {
                                       _isSelectionMode = false;
                                     }
+                                  } else {
+                                    _selectedTasks.add(task);
                                   }
                                 });
-                              },
-                            )
-                          : Checkbox(
-                              value: task.isCompleted,
-                              onChanged: (value) => _toggleTask(task, value),
+                              }
+                            : () => _showTaskModal(task: task),
+                        child: ListTile(
+                          leading: _isSelectionMode
+                              ? Checkbox(
+                                  value: _selectedTasks.contains(task),
+                                  onChanged: (selected) {
+                                    setState(() {
+                                      if (selected ?? false) {
+                                        _selectedTasks.add(task);
+                                      } else {
+                                        _selectedTasks.remove(task);
+                                        if (_selectedTasks.isEmpty) {
+                                          _isSelectionMode = false;
+                                        }
+                                      }
+                                    });
+                                  },
+                                )
+                              : Checkbox(
+                                  value: task.isCompleted,
+                                  onChanged: (value) =>
+                                      _toggleTask(task, value, index),
+                                ),
+                          title: Text(
+                            task.title,
+                            style: TextStyle(
+                              decoration: task.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
-                      title: Text(
-                        task.title,
-                        style: TextStyle(
-                          decoration: task.isCompleted
-                              ? TextDecoration.lineThrough
+                          ),
+                          subtitle: task.dueDate != null
+                              ? Text(
+                                  'Due: ${task.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}',
+                                  style: TextStyle(
+                                    decoration: task.isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                )
                               : null,
                         ),
                       ),
-                      subtitle: task.dueDate != null
-                          ? Text(
-                              'Due: ${task.dueDate!.day}/${task.dueDate!.month}/${task.dueDate!.year}',
-                              style: TextStyle(
-                                decoration: task.isCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
-                            )
-                          : null,
-                    ),
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
     );
   }
 }
