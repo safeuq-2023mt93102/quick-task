@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="108" height="108" viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background Layer (Stacked Cards) -->
+    <g id="background">
+        <!-- Bottom card -->
+        <rect x="30" y="32" width="48" height="48" rx="4"
+              fill="#E0E0E0" transform="rotate(-16, 54, 54)"/>
+        <!-- Middle card -->
+        <rect x="30" y="30" width="48" height="48" rx="4"
+              fill="#F5F5F5" transform="rotate(-8, 54, 54)"/>
+        <!-- Top card -->
+        <rect x="30" y="28" width="48" height="48" rx="4"
+              fill="#FFFFFF"/>
+    </g>
+
+    <!-- Foreground Layer (Checkmark) -->
+    <g id="foreground">
+        <path d="M 40.50 54.50 l 8.00 8.00 l 20.00 -20.00"
+              stroke="#2196F3" 
+              stroke-width="6" 
+              stroke-linecap="round" 
+              stroke-linejoin="round" 
+              fill="none"/>
+    </g>
+</svg>

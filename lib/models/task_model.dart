@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import 'task.dart';
 import 'dart:developer' as developer;
@@ -45,6 +46,7 @@ class TaskModel extends ChangeNotifier {
 
     return ParseUser.currentUser().then((currentUser) {
       if (currentUser == null) {
+        task.objectId = const Uuid().v4();
         return task;
       }
       task.user = currentUser;
@@ -68,16 +70,22 @@ class TaskModel extends ChangeNotifier {
     notifyListeners();
 
     developer.log("updateTask outside", error: task.toString());
-    return task.save().then((response) {
-      if (response.success) {
-        var newTask = response.results!.first;
-        if (index != -1) {
-          _tasks[index!] = newTask;
-        }
-        developer.log("updateTask inside", error: newTask.toString());
-        return newTask;
+    return ParseUser.currentUser().then((currentUser) {
+      if (currentUser == null) {
+        return Future.value(task);
       }
-      throw response.error?.message ?? 'Failed to update task';
+
+      return task.save().then((response) {
+        if (response.success) {
+          var newTask = response.results!.first;
+          if (index != -1) {
+            _tasks[index!] = newTask;
+          }
+          developer.log("updateTask inside", error: newTask.toString());
+          return newTask;
+        }
+        throw response.error?.message ?? 'Failed to update task';
+      });
     });
   }
 
@@ -85,6 +93,11 @@ class TaskModel extends ChangeNotifier {
     _tasks.removeWhere(
         (task) => tasksToDelete.any((t) => t.objectId == task.objectId));
     notifyListeners();
-    return Future.wait(tasksToDelete.map((task) => task.delete()));
+    return ParseUser.currentUser().then((currentUser) {
+      if (currentUser == null) {
+        return Future.value();
+      }
+      return Future.wait(tasksToDelete.map((task) => task.delete()));
+    });
   }
 }

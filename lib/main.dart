@@ -11,7 +11,7 @@ void main() async {
   await initParse();
 
   runApp(MaterialApp(
-    title: 'Tasks App',
+    title: 'QuickTask',
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       useMaterial3: true,
@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Tasks App',
+      title: 'QuickTask',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
