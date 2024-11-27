@@ -15,6 +15,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   void _login() {
+    // Validate inputs
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please provide email and password')),
+      );
+      return;
+    }
+
     // Show loading dialog
     showDialog(
       context: context,
