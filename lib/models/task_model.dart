@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
-import '../task_model.dart';
+import 'task.dart';
 import 'dart:developer' as developer;
 
 class TaskModel extends ChangeNotifier {

@@ -13,10 +13,16 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
 
   void _login() {
-    setState(() => _isLoading = true);
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
 
     final user = ParseUser(
       _emailController.text.trim(),
@@ -25,6 +31,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     user.login().then((response) {
+      // Close loading dialog
+      Navigator.pop(context);
+
       if (response.success) {
         if (!mounted) return;
         Navigator.pushReplacement(
@@ -38,14 +47,13 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     }).catchError((e) {
+      // Close loading dialog
+      Navigator.pop(context);
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
-    }).whenComplete(() {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
     });
   }
 
@@ -77,10 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _isLoading ? null : _login,
-              child: _isLoading
-                  ? const CircularProgressIndicator()
-                  : const Text('Login'),
+              onPressed: _login,
+              child: const Text('Login'),
             ),
             TextButton(
               onPressed: () {
@@ -94,10 +100,9 @@ class _LoginScreenState extends State<LoginScreen> {
             TextButton(
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TasksScreen()),
-                  (route) => false
-                );
+                    context,
+                    MaterialPageRoute(builder: (_) => const TasksScreen()),
+                    (route) => false);
               },
               child: const Text('Skip'),
             ),

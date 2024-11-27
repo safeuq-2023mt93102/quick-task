@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import 'package:provider/provider.dart';
-import '../task_model.dart';
-import '../models/task_manager.dart';
+import '../models/task.dart';
+import '../models/task_model.dart';
 import 'login_screen.dart';
 import 'dart:developer' as developer;
 
